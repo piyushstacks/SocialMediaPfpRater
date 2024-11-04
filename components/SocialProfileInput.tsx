@@ -7,6 +7,7 @@ const SocialProfileInput = ({ onProfileImage }: { onProfileImage: (url: string) 
   const [platform, setPlatform] = useState<"instagram" | "twitter">("instagram");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rating, setRating] = useState<{ grade: string; score: number } | null>(null);
 
   const handlePlatformToggle = (newPlatform: "instagram" | "twitter") => {
     setPlatform(newPlatform);
@@ -15,20 +16,30 @@ const SocialProfileInput = ({ onProfileImage }: { onProfileImage: (url: string) 
 
   const handleSearchProfileImage = async () => {
     if (!username) return;
-
+  
     setLoading(true);
     try {
-      const response = await axios.get(`/api/${platform}/profile-image`, {
+      // Fetch the profile image from the appropriate platform endpoint
+      const response = await axios.get(`/api/${platform}`, {
         params: { username },
       });
       const { imageUrl } = response.data;
       onProfileImage(imageUrl);
+  
+      // Send the image URL to the upload endpoint for rating
+      const geminiResponse = await axios.post("/api/upload", { imageUrl });
+      const { grade, score } = geminiResponse.data;
+  
+      // Update state to display the rating
+      setRating({ grade, score });
     } catch (error) {
-      console.error("Error fetching profile image:", error);
+      console.error("Error fetching profile image or rating:", error);
     } finally {
       setLoading(false);
     }
   };
+  
+  
 
   return (
     <div className="flex flex-col items-center justify-center bg-white/80 shadow-lg rounded-lg p-6 w-full max-w-md transition-transform duration-300 hover:scale-105">
@@ -69,6 +80,14 @@ const SocialProfileInput = ({ onProfileImage }: { onProfileImage: (url: string) 
       >
         {loading ? "Searching..." : `Fetch ${platform === "instagram" ? "Instagram" : "Twitter"} Profile Image`}
       </motion.button>
+      
+      {rating && (
+  <div className="mt-6 text-center">
+    <div className="text-6xl font-bold">{rating.grade}</div>
+    <div className="text-xl">Score: {rating.score.toFixed(2)}</div>
+  </div>
+)}
+
     </div>
   );
 };
