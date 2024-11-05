@@ -1,93 +1,144 @@
-"use client";
 import { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 
-const SocialProfileInput = ({ onProfileImage }: { onProfileImage: (url: string) => void }) => {
-  const [platform, setPlatform] = useState<"instagram" | "twitter">("instagram");
+const SocialProfileInput = () => {
+  const [platform, setPlatform] = useState<"instagram" | "twitter">("twitter");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
-  const [rating, setRating] = useState<{ grade: string; score: number } | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [rating, setRating] = useState<{ score: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePlatformToggle = (newPlatform: "instagram" | "twitter") => {
     setPlatform(newPlatform);
     setUsername("");
+    setProfileImage(null);
+    setRating(null);
+    setError(null);
   };
 
   const handleSearchProfileImage = async () => {
-    if (!username) return;
-  
+    if (!username) {
+      setError("Please enter a username");
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     try {
-      // Fetch the profile image from the appropriate platform endpoint
-      const response = await axios.get(`/api/${platform}`, {
+      // First get the profile image URL
+      const profileResponse = await axios.get(`/api/${platform}`, {
         params: { username },
       });
-      const { imageUrl } = response.data;
-      onProfileImage(imageUrl);
-  
-      // Send the image URL to the upload endpoint for rating
-      const geminiResponse = await axios.post("/api/upload", { imageUrl });
-      const { grade, score } = geminiResponse.data;
-  
-      // Update state to display the rating
-      setRating({ grade, score });
-    } catch (error) {
-      console.error("Error fetching profile image or rating:", error);
+      const imageUrl = profileResponse.data.imageUrl;
+      setProfileImage(imageUrl);
+
+      // Then get the Gemini rating
+      const ratingPrompt = "Rate this profile picture on professionalism, composition, and overall quality. Consider factors like lighting, background, pose, and image clarity.";
+      const geminiResponse = await axios.post("/api/upload", {
+        imageUrl,
+        prompt: ratingPrompt
+      });
+
+      setRating(geminiResponse.data);
+    } catch (error: any) {
+      setError(error.response?.data?.error || "Failed to fetch profile data");
+      setProfileImage(null);
+      setRating(null);
     } finally {
       setLoading(false);
     }
   };
-  
-  
 
   return (
-    <div className="flex flex-col items-center justify-center bg-white/80 shadow-lg rounded-lg p-6 w-full max-w-md transition-transform duration-300 hover:scale-105">
-      <div className="flex w-full mb-4">
-        <motion.button
-          onClick={() => handlePlatformToggle("instagram")}
-          className={`flex-1 p-2 text-center rounded-l-lg ${
-            platform === "instagram" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
-          } transition-all duration-300`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Instagram
-        </motion.button>
-        <motion.button
-          onClick={() => handlePlatformToggle("twitter")}
-          className={`flex-1 p-2 text-center rounded-r-lg ${
-            platform === "twitter" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
-          } transition-all duration-300`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Twitter
-        </motion.button>
-      </div>
-      <motion.input
-        type="text"
-        placeholder={`Enter ${platform} username`}
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className="border border-gray-300 rounded w-full p-2 mb-4 focus:outline-none focus:border-blue-500 transition-colors duration-300"
-        whileFocus={{ scale: 1.02 }}
-      />
-      <motion.button
-        onClick={handleSearchProfileImage}
-        className="bg-blue-600 text-white rounded px-6 py-2 w-full font-semibold shadow-md transition-transform duration-300 hover:scale-105 hover:bg-blue-700 disabled:opacity-50"
-        disabled={loading}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        {loading ? "Searching..." : `Fetch ${platform === "instagram" ? "Instagram" : "Twitter"} Profile Image`}
-      </motion.button>
-      
-      {rating && (
-  <div className="mt-6 text-center">
-    <div className="text-6xl font-bold">{rating.grade}</div>
-    <div className="text-xl">Score: {rating.score.toFixed(2)}</div>
-  </div>
-)}
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-6 space-y-8">
+      {/* Input Section */}
+      <div className="w-full max-w-md bg-white/80 shadow-lg rounded-lg p-6">
+        <div className="flex w-full mb-4">
+          <motion.button
+            onClick={() => handlePlatformToggle("instagram")}
+            className={`flex-1 p-2 text-center rounded-l-lg ${
+              platform === "instagram" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
+            } transition-all duration-300`}
+            whileHover={{ scale: 1.05 }}
+          >
+            Instagram
+          </motion.button>
+          <motion.button
+            onClick={() => handlePlatformToggle("twitter")}
+            className={`flex-1 p-2 text-center rounded-r-lg ${
+              platform === "twitter" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
+            } transition-all duration-300`}
+            whileHover={{ scale: 1.05 }}
+          >
+            Twitter
+          </motion.button>
+        </div>
+        
+        <div className="relative">
+          <motion.input
+            type="text"
+            placeholder={`Enter ${platform} username`}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border border-gray-300 rounded w-full p-2 mb-4 focus:outline-none focus:border-blue-500"
+            whileFocus={{ scale: 1.02 }}
+          />
+          
+          <motion.button
+            onClick={handleSearchProfileImage}
+            className="bg-blue-600 text-white rounded px-6 py-2 w-full font-semibold shadow-md disabled:opacity-50"
+            disabled={loading}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {loading ? "Analyzing..." : "Analyze Profile Picture"}
+          </motion.button>
+        </div>
 
+        {error && (
+          <div className="mt-4 text-red-500 text-center">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Results Section */}
+      {(profileImage || rating) && (
+        <div className="w-full flex justify-center gap-8">
+          {/* Image Display */}
+          {profileImage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-96 h-96 bg-gray-100 rounded-lg overflow-hidden shadow-lg"
+            >
+              <img
+                src={profileImage}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+          )}
+
+          {/* Rating Display */}
+          {rating && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex flex-col items-center justify-center bg-gray-900 text-white p-8 rounded-lg shadow-lg"
+            >
+              <div className="text-9xl font-bold mb-4">
+                A
+              </div>
+              <div className="text-2xl">
+                score: {rating.score.toFixed(2)}
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

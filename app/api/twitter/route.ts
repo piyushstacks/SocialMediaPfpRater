@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const response = await axios.get(
-      `https://api.twitter.com/2/users/by/username/${username}`,
+      `https://api.twitter.com/2/users/by/username/${username}?user.fields=profile_image_url`,
       {
         headers: {
           Authorization: `Bearer ${process.env.TWITTER_BEARER_TOKEN}`,
@@ -27,9 +27,8 @@ export async function GET(req: NextRequest) {
 
     const highResImageUrl = profileImageUrl.replace("_normal", "_400x400");
 
-
     return NextResponse.json({ imageUrl: highResImageUrl });
-  } catch (error) {
+  } catch (error: any) {
     if (axios.isAxiosError(error)) {
       console.error("Error fetching Twitter profile image:", error.response?.data || error.message);
     } else {
