@@ -27,17 +27,19 @@ const SocialProfileInput = () => {
     setLoading(true);
     setError(null);
     try {
-      // First get the profile image URL
+      // First get the profile image path
       const profileResponse = await axios.get(`/api/${platform}`, {
         params: { username },
       });
-      const imageUrl = profileResponse.data.imageUrl;
+      const imagePath = profileResponse.data.imagePath;
+      const imageUrl = `/api/images?imagePath=${imagePath}`;
       setProfileImage(imageUrl);
+
 
       // Then get the Gemini rating
       const ratingPrompt = "Rate this profile picture on professionalism, composition, and overall quality. Consider factors like lighting, background, pose, and image clarity.";
       const geminiResponse = await axios.post("/api/upload", {
-        imageUrl,
+        imagePath,
         prompt: ratingPrompt
       });
 
@@ -112,28 +114,22 @@ const SocialProfileInput = () => {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-96 h-96 bg-gray-100 rounded-lg overflow-hidden shadow-lg"
+              className="w-96 h-96 bg-gray-100 rounded-lg shadow-lg overflow-hidden"
             >
-              <img
-                src={profileImage}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
+              <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
             </motion.div>
           )}
 
           {/* Rating Display */}
           {rating && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex flex-col items-center justify-center bg-gray-900 text-white p-8 rounded-lg shadow-lg"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center bg-white/80 shadow-lg rounded-lg p-6 w-full max-w-md"
             >
-              <div className="text-9xl font-bold mb-4">
-                A
-              </div>
-              <div className="text-2xl">
-                score: {rating.score.toFixed(2)}
+              <div className="text-3xl font-bold mb-4">Rating: {rating.score}/10</div>
+              <div className="text-lg text-gray-700">
+                {/* Additional rating details can go here */}
               </div>
             </motion.div>
           )}
