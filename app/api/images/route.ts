@@ -1,22 +1,53 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import puppeteer from 'puppeteer';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { imagePath } = req.query;
+async function getTwitterProfileImageBase64(username: string): Promise<string> {
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
 
-  if (!imagePath || Array.isArray(imagePath)) {
-    res.status(400).json({ error: 'Invalid image path' });
-    return;
+  await page.goto(`https://twitter.com/${username}`, { waitUntil: 'networkidle2' });
+
+  const profileImageElement = await page.$('div[role="img"] img');
+  
+  if (!profileImageElement) {
+    await browser.close();
+    throw new Error("Profile image not found");
   }
 
-  const fullPath = path.resolve('path/to/images/directory', imagePath as string);
+  const profileImageUrl = await page.evaluate(
+    (element) => element.src,
+    profileImageElement
+  );
 
-  if (!fs.existsSync(fullPath)) {
-    res.status(404).json({ error: 'Image not found' });
-    return;
+  const imageResponse = await page.goto(profileImageUrl);
+  if (!imageResponse) {
+    await browser.close();
+    throw new Error("Failed to download profile image");
   }
 
-  res.setHeader('Content-Type', 'image/jpeg');
-  fs.createReadStream(fullPath).pipe(res);
+  const imageBuffer = await imageResponse.buffer();
+  const base64Image = imageBuffer.toString('base64');
+
+  await browser.close();
+  return `data:image/jpeg;base64,${base64Image}`;
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const username = searchParams.get('username');
+
+  if (!username) {
+    return NextResponse.json({ error: "Username is required" }, { status: 400 });
+  }
+
+  try {
+    const base64Image = await getTwitterProfileImageBase64(username);
+    return NextResponse.json({ image: base64Image });
+  } catch (error: any) {
+    console.error('Twitter API Error:', error);
+    return NextResponse.json(
+      { error: "Failed to fetch Twitter profile image" },
+      { status: 500 }
+    );
+  }
 }

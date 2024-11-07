@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import fs from 'fs';
+import { NextApiRequest, NextApiResponse } from 'next';
+import fs from 'fs/promises';
+import path from 'path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 async function getImageFromPath(imagePath: string): Promise<Buffer> {
-  return fs.readFileSync(imagePath);
+  return fs.readFile(imagePath);
 }
 
 async function analyzeImageWithGemini(imageData: Buffer, prompt: string) {
@@ -50,33 +51,34 @@ async function analyzeImageWithGemini(imageData: Buffer, prompt: string) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return;
+  }
+
   try {
-    const { imagePath, prompt } = await req.json();
+    const { imagePath, prompt } = req.body;
 
     if (!imagePath || !prompt) {
-      return NextResponse.json(
-        { error: "Image path and prompt are required" },
-        { status: 400 }
-      );
+      res.status(400).json({ error: "Image path and prompt are required" });
+      return;
     }
 
     // Get image data from path
-    const imageData = await getImageFromPath(imagePath);
+    const imageData = await getImageFromPath(path.resolve(imagePath));
 
     // Analyze with Gemini
     const analysis = await analyzeImageWithGemini(imageData, prompt);
 
-    return NextResponse.json(analysis);
+    res.status(200).json(analysis);
 
   } catch (error: any) {
     console.error('Upload Route Error:', error);
-    return NextResponse.json(
-      { 
-        error: "Failed to analyze image",
-        details: error.message 
-      },
-      { status: 500 }
-    );
+    res.status(500).json({ 
+      error: "Failed to analyze image",
+      details: error.message 
+    });
   }
 }
