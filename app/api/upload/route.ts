@@ -1,84 +1,72 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs/promises';
-import path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createCanvas, loadImage } from 'canvas';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+async function rateImage(imageUrl: string) {
+  const img = await loadImage(imageUrl);
+  const canvas = createCanvas(img.width, img.height);
+  const context = canvas.getContext('2d');
+  context.drawImage(img, 0, 0);
 
-async function getImageFromPath(imagePath: string): Promise<Buffer> {
-  return fs.readFile(imagePath);
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const { data, width, height } = imageData;
+
+  const resolutionScore = calculateResolutionScore(width, height);
+  const colorScore = calculateColorScore(data);
+  const contrastScore = calculateContrastScore(data);
+
+  const totalScore = (
+    resolutionScore * 0.4 +
+    colorScore * 0.3 +
+    contrastScore * 0.3
+  ).toFixed(2);
+
+  return { score: parseFloat(totalScore), grade: assignGrade(parseFloat(totalScore)) };
 }
 
-async function analyzeImageWithGemini(imageData: Buffer, prompt: string) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-vision" });
-
-    // Convert buffer to base64
-    const base64Image = imageData.toString('base64');
-    
-    // Prepare image for Gemini
-    const imageParts = [
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType: "image/jpeg"
-        }
-      }
-    ];
-
-    // Create analysis prompt
-    const analysisPrompt = `
-      Analyze this image based on the following criteria:
-      ${prompt}
-      Rate it on a scale of 1-10 and provide a detailed explanation.
-      Format the response as JSON with the following structure:
-      {
-        "score": (number between 1-10),
-        "rating": (brief one-line summary),
-        "analysis": (detailed explanation)
-      }
-    `;
-
-    // Generate content
-    const result = await model.generateContent([analysisPrompt, ...imageParts]);
-    const response = await result.response;
-    
-    return JSON.parse(response.text());
-  } catch (error) {
-    console.error('Gemini Analysis Error:', error);
-    throw error;
-  }
+function calculateResolutionScore(width: number, height: number) {
+  const resolution = width * height;
+  return resolution > 1000000 ? 1 : resolution / 1000000;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
-    return;
+function calculateColorScore(data: Uint8ClampedArray) {
+  let colorfulness = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+    colorfulness += Math.abs(r - g) + Math.abs(g - b) + Math.abs(b - r);
   }
+  return Math.min(colorfulness / data.length, 1);
+}
 
+function calculateContrastScore(data: Uint8ClampedArray) {
+  let contrast = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+    contrast += 0.299 * r + 0.587 * g + 0.114 * b;
+  }
+  const maxContrast = 255 * 3;
+  return Math.min(contrast / maxContrast, 1);
+}
+
+function assignGrade(score: number) {
+  if (score >= 0.85) return 'A';
+  if (score >= 0.7) return 'B';
+  if (score >= 0.5) return 'C';
+  return 'D';
+}
+
+// Named export for POST method
+export async function POST(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { imagePath, prompt } = req.body;
+    const { imageUrl } = req.body;
 
-    if (!imagePath || !prompt) {
-      res.status(400).json({ error: "Image path and prompt are required" });
-      return;
+    if (!imageUrl) {
+      return res.status(400).json({ error: "Image URL is required" });
     }
 
-    // Get image data from path
-    const imageData = await getImageFromPath(path.resolve(imagePath));
-
-    // Analyze with Gemini
-    const analysis = await analyzeImageWithGemini(imageData, prompt);
-
-    res.status(200).json(analysis);
-
+    const { score, grade } = await rateImage(imageUrl);
+    res.status(200).json({ score, grade });
   } catch (error: any) {
-    console.error('Upload Route Error:', error);
-    res.status(500).json({ 
-      error: "Failed to analyze image",
-      details: error.message 
-    });
+    console.error('Error processing the image:', error);
+    res.status(500).json({ error: "Failed to process image", details: error.message });
   }
 }

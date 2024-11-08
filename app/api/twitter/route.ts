@@ -39,7 +39,7 @@ async function getTwitterAvatar(twitterUsername: string): Promise<string | null>
         if (url) break; // Exit loop if URL is found
       } catch {
         console.warn(`Retry attempt ${attempt + 1} for @${twitterUsername}`);
-        await delay(2000); // Wait before retrying
+        await delay(3000); // Wait before retrying
       }
     }
 
