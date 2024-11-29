@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios, { AxiosError } from "axios";
 import { AlertCircle } from "lucide-react";
 
@@ -21,6 +21,26 @@ const SocialProfileInput = () => {
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState<Rating | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        handleSearchProfileImage();
+      }
+    };
+
+    const input = inputRef.current;
+    if (input) {
+      input.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      if (input) {
+        input.removeEventListener("keydown", handleKeyDown);
+      }
+    };
+  }, [username]);
 
   const resetState = () => {
     setUsername("");
@@ -34,46 +54,74 @@ const SocialProfileInput = () => {
     resetState();
   };
 
-  const assignGrade = (score: number): string => {
-    if (score >= 85) return "A";
-    if (score >= 70) return "B";
-    if (score >= 50) return "C";
-    return "D";
-  };
+  const getBase64ImageData = async (imageUrl: string): Promise<string> => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = imageUrl;
 
-  const calculateScore = (data: Uint8ClampedArray, width: number, height: number): number => {
-    const resolutionScore = Math.min((width * height / 500000) * 25, 25);
-    const colorScore = Math.min(data.reduce((acc, val, idx) => idx % 4 === 0 ? acc + Math.abs(data[idx] - data[idx + 1]) : acc, 0) / data.length * 10, 20);
-    const brightnessScore = Math.min(data.reduce((acc, val, idx) => idx % 4 === 0 ? acc + (data[idx] + data[idx + 1] + data[idx + 2]) / 3 : acc, 0) / (data.length / 4) / 15, 20);
-    const sharpnessScore = Math.min(data.reduce((acc, _, idx) => (idx + 4 < data.length) ? acc + Math.abs(data[idx] - data[idx + 4]) : acc, 0) / (width * height) * 10, 20);
-    const contrastScore = Math.min(data.reduce((acc, val) => acc + val, 0) / (255 * 3) * 25, 25);
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
 
-    return Math.min(resolutionScore + colorScore + brightnessScore + sharpnessScore + contrastScore, 100);
-  };
-
-  const rateImage = async (imageElement: HTMLImageElement): Promise<Rating> => {
     const canvas = canvasRef.current;
-    if (!canvas) throw new Error("Canvas not available");
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      ctx?.drawImage(image, 0, 0);
+      return canvas.toDataURL("image/jpeg").split(",")[1]; // Get base64 part
+    }
+    throw new Error("Failed to process image for rating");
+  };
 
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("2D context not available");
+  // Updated rateImage function to use the Gemini model and base64 data
+  const rateImage = async (imageBase64: string): Promise<Rating> => {
+    try {
+      // Use NEXT_PUBLIC_ prefix for client-side environment variables
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    canvas.width = imageElement.naturalWidth;
-    canvas.height = imageElement.naturalHeight;
-    context.drawImage(imageElement, 0, 0);
+      if (!apiKey) {
+        throw new Error("Gemini API key is not configured");
+      }
 
-    const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+      const response = await axios.post('/api/gemini_model', {
+        image: imageBase64, // Base64 data URI
+        apiKey: apiKey, // Correctly pass the API key
+      }, {
+        // Optional: add timeout and error handling config
+        timeout: 10000, // 10 seconds timeout
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    // Check if the image likely contains anime or non-human content
-    const isAnime = data.some((val, idx) => idx % 4 === 0 && val > 200 && data[idx + 1] < 50 && data[idx + 2] > 200);
-    const isHuman = data.some((val, idx) => idx % 4 === 0 && val > 100 && data[idx + 1] > 40 && data[idx + 2] < 200);
+      // Destructure score and grade, with type safety and default values
+      const { score, grade } = response.data;
 
-    // Calculate score with penalties
-    let score = calculateScore(data, width, height);
-    if (isAnime) score *= 0.7; // Penalize anime images
-    if (!isHuman) score *= 0.8; // Penalize non-human images
+      // Validate the response
+      if (typeof score !== 'number' || typeof grade !== 'string') {
+        throw new Error("Invalid response format from Gemini model");
+      }
 
-    return { score, grade: assignGrade(score) };
+      return {
+        score: Math.min(Math.max(score, 0), 100), // Ensure score is between 0-100
+        grade: grade.toUpperCase() // Normalize grade to uppercase
+      };
+    } catch (error) {
+      // More detailed error handling
+      if (axios.isAxiosError(error)) {
+        // Axios-specific error handling
+        const errorMessage = error.response?.data?.detail || error.message;
+        console.error("Gemini API Error:", errorMessage);
+        throw new Error(`Failed to rate image: ${errorMessage}`);
+      } else if (error instanceof Error) {
+        console.error("Image Rating Error:", error.message);
+        throw error;
+      } else {
+        console.error("Unknown error occurred", error);
+        throw new Error("An unexpected error occurred while rating the image");
+      }
+    }
   };
 
   const handleSearchProfileImage = async () => {
@@ -88,21 +136,13 @@ const SocialProfileInput = () => {
 
       setProfileImage(data.imageUrl);
 
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-
-      await new Promise<void>((resolve, reject) => {
-        img.onload = async () => {
-          try {
-            setRating(await rateImage(img));
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        };
-        img.onerror = () => reject(new Error("Failed to load image"));
-        img.src = data.imageUrl;
-      });
+      try {
+        const base64ImageData = await getBase64ImageData(data.imageUrl);
+        const ratingResult = await rateImage(base64ImageData);
+        setRating(ratingResult);
+      } catch (error) {
+        setError("Failed to rate the profile image");
+      }
     } catch (error) {
       if (error instanceof AxiosError) {
         setError(error.response?.data?.error || error.message);
@@ -137,6 +177,7 @@ const SocialProfileInput = () => {
 
         <div className="space-y-4">
           <input
+            ref={inputRef}
             type="text"
             placeholder={`Enter ${platform} username`}
             value={username}

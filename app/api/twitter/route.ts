@@ -17,13 +17,13 @@ async function getTwitterAvatar(twitterUsername: string): Promise<string | null>
     });
 
     const page = await browser.newPage();
-    await page.goto(`https://twitter.com/${twitterUsername}`, {
-      waitUntil: 'domcontentloaded', // Switch to 'domcontentloaded' for faster initial load
+    await page.goto(`https://x.com/${twitterUsername}`, {
+      waitUntil: 'domcontentloaded',
     });
 
     // Use retry attempts to account for load issues with smaller accounts
     let url = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         // Wait for a more specific selector or a longer time
         await page.waitForSelector('a[href$="/photo"] img[src], img[alt*="Profile photo"]', {
@@ -39,7 +39,7 @@ async function getTwitterAvatar(twitterUsername: string): Promise<string | null>
         if (url) break; // Exit loop if URL is found
       } catch {
         console.warn(`Retry attempt ${attempt + 1} for @${twitterUsername}`);
-        await delay(3000); // Wait before retrying
+        await delay(2000); // Wait before retrying
       }
     }
 
