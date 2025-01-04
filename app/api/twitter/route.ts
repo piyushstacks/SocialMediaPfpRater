@@ -1,16 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
 
+import withCors from '@/lib/cors';
+
 // Helper function to add a delay
 function delay(time: number) {
   return new Promise(resolve => setTimeout(resolve, time));
 }
 
+// Function to convert image URL to base64
+async function urlToBase64(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  const buffer = await response.arrayBuffer();
+  return Buffer.from(buffer).toString('base64');
+}
+
 // Define the function to fetch the Twitter avatar
 async function getTwitterAvatar(twitterUsername: string): Promise<string | null> {
+  // First attempt using unavatar.io
+  const unavatarUrl = `https://unavatar.io/twitter/${twitterUsername}`;
+  try {
+    const response = await fetch(unavatarUrl);
+    if (response.ok) {
+      const base64 = await urlToBase64(unavatarUrl);
+      return `data:image/jpeg;base64,${base64}`;
+    }
+  } catch (error) {
+    console.warn(`Unavatar.io fetch failed for @${twitterUsername}`, error);
+  }
+
+  // If unavatar.io fails, proceed with Puppeteer
   let browser;
   try {
-    // Launch Puppeteer with necessary options
     browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       headless: true,
@@ -37,14 +58,16 @@ async function getTwitterAvatar(twitterUsername: string): Promise<string | null>
         });
 
         if (url) break; // Exit loop if URL is found
-      } catch {
-        console.warn(`Retry attempt ${attempt + 1} for @${twitterUsername}`);
+      } catch (error) {
+        console.warn(`Retry attempt ${attempt + 1} for @${twitterUsername}`, error);
         await delay(2000); // Wait before retrying
       }
     }
 
     if (!url) throw new Error("Profile image not found after multiple attempts");
-    return url;
+
+    const base64 = await urlToBase64(url);
+    return `data:image/jpeg;base64,${base64}`;
   } catch (error) {
     console.error(`Error fetching avatar for @${twitterUsername}:`, error);
     return null;
@@ -80,3 +103,6 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+// Apply the CORS middleware
+export default withCors(GET);

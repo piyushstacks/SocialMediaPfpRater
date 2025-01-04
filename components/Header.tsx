@@ -14,7 +14,7 @@ const Header: React.FC = () => {
           {/* App Name */}
           <div className="text-lg font-semibold">
             <Link href="/" className="hover:text-gray-300">
-              X and IG PFP Image Rater
+              XIG PFP Rater
             </Link>
           </div>
           
@@ -31,12 +31,12 @@ const Header: React.FC = () => {
             </button>
             
             {/* GitHub Star Button */}
-            <Link href="https://github.com/yourusername/your-repo" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Star on GitHub">
+            <Link href="https://github.com/piyushstacks" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Star on GitHub">
               <FaGithub size={18} />
             </Link>
             
             {/* Twitter Follow Button */}
-            <Link href="https://twitter.com/yourusername" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Follow on Twitter">
+            <Link href="https://twitter.com/piyushstacks" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Follow on Twitter">
               <FaTwitter size={18} />
             </Link>
           </div>

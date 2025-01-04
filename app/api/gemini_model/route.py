@@ -133,7 +133,7 @@ async def get_image_rating(request: RatingRequest):
                 result = await resp.json()
 
                 # Extract generated text
-                generated_text = result['candidates'][0]['content']['parts'][0]['text']
+                generated_text = result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
                 logger.info(f"Generated Text: {generated_text}")
 
                 # Extract score and grade using regex

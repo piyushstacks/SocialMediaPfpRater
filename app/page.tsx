@@ -11,7 +11,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center px-4">
+    <main className="flex h-auto flex-col items-center px-4">
       <SocialProfileInput onProfileImage={handleProfileImage} />
       {profileImageUrl && (
         <div className="mt-4">

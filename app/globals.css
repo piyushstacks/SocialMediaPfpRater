@@ -31,5 +31,7 @@
   body {
     font-family: var(--font-inter);
     transition: background-color 0.3s, color 0.3s;
+    height: 100%; /* Ensure the body doesn't overflow */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
   }
   

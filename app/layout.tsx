@@ -17,18 +17,18 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Image Rater App',
-    template: '%s | Image Rater App'
+    default: 'XIG PFP Rater',
+    template: '%s | XIG PFP Rater'
   },
   description: 'Upload and rate images easily',
   keywords: ['image rating', 'photo sharing', 'web app'],
   authors: [{ name: 'Your Name' }],
   metadataBase: new URL('https://your-domain.com'),
   openGraph: {
-    title: 'Image Rater App',
+    title: 'XIG PFP Rater',
     description: 'Upload and rate images easily',
     url: 'https://your-domain.com',
-    siteName: 'Image Rater App',
+    siteName: 'XIG PFP Rater',
     locale: 'en_US',
     type: 'website',
   },
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       suppressHydrationWarning
     >
       <body 
-        className={`${inter.className} relative pt-28 sm:pt-36
+        className={`${inter.className} relative
           bg-gray-100 text-gray-900
           dark:bg-gray-950 dark:text-gray-100
           transition-colors duration-300 ease-in-out`}
@@ -68,15 +68,18 @@ export default function RootLayout({ children }: RootLayoutProps) {
             transition-colors duration-500 ease-in-out"
         />
 
-        <ThemeProvider>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-          </div>
-        </ThemeProvider>
+
+      
+<ThemeProvider>
+  <div className="flex min-h-screen flex-col">
+    <Header />
+    <main className="flex-grow flex flex-col items-center justify-center">
+      {children}
+    </main>
+    <Footer />
+  </div>
+</ThemeProvider>
+
       </body>
     </html>
   )
