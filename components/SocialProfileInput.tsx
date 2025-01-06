@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { AlertCircle, Instagram } from "lucide-react";
 import { FaSearch } from "react-icons/fa";
@@ -26,8 +26,29 @@ const SocialProfileInput = () => {
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState<Rating | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Memoize API calls
+  const rateImage = useCallback(async (imageUrl: string) => {
+    try {
+      const response = await axios.post("/api/rate-image", { imageBase64: imageUrl });
+      const { success, overallRating, grade, error } = response.data;
 
-  const handleSearchProfileImage = async () => {
+      if (success) {
+        setRating({
+          overallRating,
+          grade,
+          platform: displayPlatform,
+          username: username.trim()
+        });
+      } else {
+        setError(error || "Failed to rate the image");
+      }
+    } catch (error) {
+      setError("Error occurred while rating the image");
+    }
+  }, [displayPlatform, username]);
+
+  const handleSearchProfileImage = useCallback(async () => {
     const trimmedUsername = username.trim();
     if (!trimmedUsername || /[^a-zA-Z0-9._]/.test(trimmedUsername)) {
       return setError("Please enter a valid username (alphanumeric, dots, underscores only).");
@@ -57,50 +78,18 @@ const SocialProfileInput = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [platform, username, rateImage]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Enter" && username.trim()) {
-        handleSearchProfileImage();
-      }
-    };
-
-    const currentInput = inputRef.current;
-    currentInput?.addEventListener("keydown", handleKeyDown);
-    return () => {
-      currentInput?.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [username]);
-
-  const handlePlatformToggle = (newDisplayPlatform: DisplayPlatformType) => {
+  // Memoize platform toggle handler
+  const handlePlatformToggle = useCallback((newDisplayPlatform: DisplayPlatformType) => {
     setDisplayPlatform(newDisplayPlatform);
     setPlatform(newDisplayPlatform === "x" ? "twitter" : "instagram");
-    setUsername(""); // Only reset username, keep the results
-    setError(null); // Clear any existing errors
-  };
+    setUsername("");
+    setError(null);
+  }, []);
 
-  const rateImage = async (imageUrl: string) => {
-    try {
-      const response = await axios.post("/api/rate-image", { imageBase64: imageUrl });
-      const { success, overallRating, grade, error } = response.data;
-
-      if (success) {
-        setRating({
-          overallRating,
-          grade,
-          platform: displayPlatform,
-          username: username.trim()
-        });
-      } else {
-        setError(error || "Failed to rate the image");
-      }
-    } catch (error) {
-      setError("Error occurred while rating the image");
-    }
-  };
-
-  const handleShare = (rating: Rating) => {
+  // Memoize share handler
+  const handleShare = useCallback((rating: Rating) => {
     try {
       const platformDisplay = rating.platform === "x" ? "X/Twitter" : "Instagram";
       const tweetText = `My ${platformDisplay} (@${rating.username}) profile image got ${rating.overallRating}/10 with a grade of ${rating.grade} Rating! What's yours? Try this on xyz.com now ⚡`;
@@ -110,7 +99,73 @@ const SocialProfileInput = () => {
       console.error("Error sharing the result:", error);
       alert("Failed to share the result. Please try again.");
     }
-  };
+  }, []);
+
+  // Memoize platform buttons
+  const platformButtons = useMemo(() => [
+    { 
+      id: "x", 
+      icon: (
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          viewBox="0 0 50 50"
+          className="w-5 h-5"
+          fill="currentColor"
+        >
+          <path d="M 11 4 C 7.134 4 4 7.134 4 11 L 4 39 C 4 42.866 7.134 46 11 46 L 39 46 C 42.866 46 46 42.866 46 39 L 46 11 C 46 7.134 42.866 4 39 4 L 11 4 z M 13.085938 13 L 21.023438 13 L 26.660156 21.009766 L 33.5 13 L 36 13 L 27.789062 22.613281 L 37.914062 37 L 29.978516 37 L 23.4375 27.707031 L 15.5 37 L 13 37 L 22.308594 26.103516 L 13.085938 13 z M 16.914062 15 L 31.021484 35 L 34.085938 35 L 19.978516 15 L 16.914062 15 z" />
+        </svg>
+      )
+    },
+    { id: "instagram", icon: <Instagram className="w-5 h-5" /> }
+  ], []);
+
+  // Debounced effect for keyboard events
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && username.trim()) {
+        // Clear any existing timeout
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        // Set a new timeout
+        timeoutId = setTimeout(() => {
+          handleSearchProfileImage();
+        }, 300); // 300ms debounce
+      }
+    };
+
+    const currentInput = inputRef.current;
+    currentInput?.addEventListener("keydown", handleKeyDown);
+    
+    return () => {
+      currentInput?.removeEventListener("keydown", handleKeyDown);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [username, handleSearchProfileImage]);
+
+  // Memoize loading and error states for conditional rendering
+  const statusMessage = useMemo(() => {
+    if (error) {
+      return (
+        <div className="flex items-center space-x-2 text-red-600 dark:text-red-400" aria-live="assertive">
+          <AlertCircle />
+          <span>{error}</span>
+        </div>
+      );
+    }
+    if (loading) {
+      return (
+        <div className="text-center text-blue-500" aria-live="polite">
+          Loading...
+        </div>
+      );
+    }
+    return null;
+  }, [error, loading]);
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl mx-auto space-y-6 overflow-hidden">
@@ -118,19 +173,7 @@ const SocialProfileInput = () => {
         {/* Platform Toggle with Results */}
         <div className="space-y-4">
           <div className="flex w-full bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-            {[
-              { id: "x", icon: (
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 50 50"
-                  className="w-5 h-5"
-                  fill="currentColor"
-                >
-                  <path d="M 11 4 C 7.134 4 4 7.134 4 11 L 4 39 C 4 42.866 7.134 46 11 46 L 39 46 C 42.866 46 46 42.866 46 39 L 46 11 C 46 7.134 42.866 4 39 4 L 11 4 z M 13.085938 13 L 21.023438 13 L 26.660156 21.009766 L 33.5 13 L 36 13 L 27.789062 22.613281 L 37.914062 37 L 29.978516 37 L 23.4375 27.707031 L 15.5 37 L 13 37 L 22.308594 26.103516 L 13.085938 13 z M 16.914062 15 L 31.021484 35 L 34.085938 35 L 19.978516 15 L 16.914062 15 z" />
-                </svg>
-              )},
-              { id: "instagram", icon: <Instagram className="w-5 h-5" /> }
-            ].map(({ id, icon }) => (
+            {platformButtons.map(({ id, icon }) => (
               <button
                 key={id}
                 onClick={() => handlePlatformToggle(id as DisplayPlatformType)}
@@ -146,7 +189,6 @@ const SocialProfileInput = () => {
             ))}
           </div>
 
-          {/* Last Result Display */}
           {rating && rating.platform !== displayPlatform && (
             <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
               Last {rating.platform === "x" ? "X/Twitter" : "Instagram"} result: @{rating.username} - {rating.overallRating}/10 ({rating.grade})
@@ -156,10 +198,7 @@ const SocialProfileInput = () => {
 
         {/* Input Field */}
         <div className="flex items-center space-x-2 mb-4 relative mt-4">
-          <div
-            className="absolute left-4 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white cursor-pointer"
-            title="Don't include '@' in username"
-          >
+          <div className="absolute left-4 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white cursor-pointer">
             @
           </div>
           <input
@@ -173,26 +212,14 @@ const SocialProfileInput = () => {
           <button
             onClick={handleSearchProfileImage}
             className="px-4 py-2 bg-blue-500 text-white rounded-md shadow-md flex items-center space-x-2 hover:bg-blue-600"
+            disabled={loading}
           >
             <FaSearch />
             <span>Search</span>
           </button>
         </div>
 
-        {/* Error Notification */}
-        {error && (
-          <div className="flex items-center space-x-2 text-red-600 dark:text-red-400" aria-live="assertive">
-            <AlertCircle />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <div className="text-center text-blue-500" aria-live="polite">
-            Loading...
-          </div>
-        )}
+        {statusMessage}
 
         {/* Profile Image and Rating */}
         {profileImage && rating && rating.platform === displayPlatform && (
@@ -201,6 +228,7 @@ const SocialProfileInput = () => {
               src={profileImage}
               alt="Profile"
               className="w-32 h-32 rounded-full shadow-md"
+              loading="lazy"
             />
             <div className="text-center">
               <p className="text-lg font-semibold">Rating: {rating.overallRating} / 10</p>
