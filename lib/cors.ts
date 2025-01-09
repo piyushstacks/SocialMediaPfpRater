@@ -1,26 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
+// // app/lib/cors.ts
+// import { NextRequest, NextResponse } from 'next/server';
 
-interface Handler {
-    (req: NextRequest, res: NextResponse): Promise<NextResponse>;
-}
+// export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH';
+// type RouteHandler = (req: NextRequest) => Promise<NextResponse>;
 
-export default function withCors(handler: Handler) {
-    return async (req: NextRequest, res: NextResponse): Promise<NextResponse> => {
-        res.headers.set('Access-Control-Allow-Credentials', 'true');
-        res.headers.set('Access-Control-Allow-Origin', '*'); // Update this to your domain in production
-        res.headers.set(
-            'Access-Control-Allow-Methods',
-            'GET,OPTIONS,PATCH,DELETE,POST,PUT'
-        );
-        res.headers.set(
-            'Access-Control-Allow-Headers',
-            'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-        );
+// export function withCors(
+//   handler: RouteHandler,
+//   methods: HttpMethod[] = ['GET']
+// ): RouteHandler {
+//   return async function corsHandler(req: NextRequest): Promise<NextResponse> {
+//     const corsHeaders = {
+//       'Access-Control-Allow-Origin': '*',
+//       'Access-Control-Allow-Methods': methods.join(', '),
+//       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+//       'Access-Control-Max-Age': '86400',
+//     };
 
-        if (req.method === 'OPTIONS') {
-            return new NextResponse(null, { status: 200 });
-        }
+//     // Handle preflight
+//     if (req.method === 'OPTIONS') {
+//       return NextResponse.json({}, { 
+//         status: 204,
+//         headers: corsHeaders
+//       });
+//     }
 
-        return handler(req, res);
-    };
-}
+//     // Handle actual request
+//     const response = await handler(req);
+    
+//     // Create a new response with CORS headers
+//     const finalResponse = new NextResponse(response.body, {
+//       status: response.status,
+//       statusText: response.statusText,
+//       headers: {
+//         ...corsHeaders,
+//         ...(response.headers && Object.fromEntries(response.headers.entries()))
+//       },
+//     });
+
+//     return finalResponse;
+//   };
+// }

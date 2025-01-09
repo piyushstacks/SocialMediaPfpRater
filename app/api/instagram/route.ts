@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
-import withCors from '@/lib/cors';
 
 // Helper function to add a delay
 function delay(time: number) {
@@ -106,5 +105,4 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Apply the CORS middleware
-export default withCors(GET);
+export default GET;
