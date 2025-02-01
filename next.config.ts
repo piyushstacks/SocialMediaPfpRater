@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
-// /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
+  reactStrictMode: true, // This is fine to keep
   async headers() {
     return [
       {

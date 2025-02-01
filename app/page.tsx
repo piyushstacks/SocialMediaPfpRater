@@ -13,11 +13,11 @@ export default function Home() {
   return (
     <main className="flex h-auto flex-col items-center px-4">
       <SocialProfileInput onProfileImage={handleProfileImage} />
-      {profileImageUrl && (
+      {/* {profileImageUrl && (
         <div className="mt-4">
           <img src={profileImageUrl} alt="Profile" className="w-32 h-32 rounded-full" />
         </div>
-      )}
+      )} */}
     </main>
   );
 }
